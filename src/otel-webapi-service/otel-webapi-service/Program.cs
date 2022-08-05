@@ -1,4 +1,3 @@
-using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +14,7 @@ builder.Services.AddOpenTelemetryMetrics(builder =>
 {
     builder
         .AddMeter("otel-webapi-service")
+        .AddRuntimeInstrumentation()
         .AddPrometheusExporter();
 });
 
