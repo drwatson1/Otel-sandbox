@@ -33,7 +33,6 @@ In your `Program.cs` add the following code to add all necessary services:
 builder.Services.AddOpenTelemetryMetrics(builder =>
 {
     builder
-        .AddMeter("otel-webapi-service")
         .AddPrometheusExporter();
 });
 ```
@@ -65,7 +64,6 @@ And then configure metrics:
 builder.Services.AddOpenTelemetryMetrics(builder =>
 {
     builder
-        .AddMeter("otel-webapi-service")
         .AddRuntimeInstrumentation()  // <---- Add this line
         .AddPrometheusExporter();
 });
@@ -106,6 +104,8 @@ Basically, the reasons are:
 
 The alternatives you can find on [this](https://prometheus.io/docs/introduction/comparison/) page.
 
+#### Visualize data with the Prometheus
+
 Let's begin. [Download the latest release](https://prometheus.io/download). Follow the [instruction](https://prometheus.io/docs/introduction/first_steps/) to configure and run it. You can use the simplest possible configuration file as following:
 
 ```yaml
@@ -133,3 +133,126 @@ Select `Graph` tab:
 If you use a service example from this repo, you can play with `Memory/Allocate`, `Memory/Free` and `Memory/FreeAll` endpoints to allocate and free memory to see how it influences to the plot:
 
 ![image](./images/prometheus-3.jpg)
+
+### Add a custom counter
+
+I will use a sample service from this repository. To use a custom metric we need some steps:
+
+* some stuff, which we want to measure;
+* the counter as itself;
+* enable our counters;
+* use the counter;
+* visualize the data.
+
+#### Staff to be measured
+
+To make the example more realistic, let's consider some workers. We can start the worker with given name. The worker do its job and after some time automatically finishes. We can run multiple workers and they will work in parallel.
+
+The worker implementation is straightforward (see Worker.cs):
+
+```csharp
+    public class Worker
+    {
+        public Worker ()
+        {
+        }
+
+        public async Task Run()
+        {
+            await Task.Run(async () =>
+            {
+                var sec = Random.Shared.Next(120);
+                await Task.Delay(sec * 1000);
+            });
+        }
+    }
+```
+
+We want to count the amount of active instances of workers as well as the amount of all created workers.
+
+#### The counter of workers
+
+We will use a class to gather all metrics together and will call it `Metrics` (see Metrics.cs).
+
+First of all, we should create a `Meter` - something like a factory to create any metrics.
+
+```csharp
+public Meter Meter { get; } = new Meter("otel.webapi.service", "1.0");
+```
+
+Our meter contains some name and version. This name we will use later.
+Next, we create counters:
+
+```csharp
+ActiveInstances = meter.CreateCounter<long>("workers.active_count", "items", "Number of active workers");
+Count = meter.CreateCounter<long>("workers.count", "items",  "Number of created workers");
+```
+
+Each counter should have a mandatory name and optional unit and description.
+
+#### Enable our counters
+
+Each counter is associated with its correspondent `Meter`. To make counters work you should add your meter first. Let's go back to our `Program.cs` and add our meter:
+
+```csharp
+// Add OpenTelemetry services
+builder.Services.AddOpenTelemetryMetrics(builder =>
+{
+    builder
+        .AddMeter("otel.webapi.service")    // <---- Add this line
+        .AddRuntimeInstrumentation()  
+        .AddPrometheusExporter();
+});
+```
+
+Note the name of the added meter, it should be the same as used for your meter. You can add as many meters as you want. After the meter is added, all your counter are enabled by default and you can disable or enable each of them.
+
+#### Use the counter
+
+Using the counter is pretty simple. Let's return to our worker and add counters:
+
+```csharp
+public async Task Run()
+{
+    await Task.Run(async () =>
+    {
+        Metrics.Workers.ActiveInstances.Add(1, TagList);
+        Metrics.Workers.Count.Add(1, TagList);
+
+        var sec = Random.Shared.Next(120);
+        await Task.Delay(sec * 1000);
+    });
+    Metrics.Workers.ActiveInstances.Add(-1, TagList);
+}
+```
+
+As you can see, you a counter allow you add or remove any value and attach tags to the counters. Tag is a simple key-value pair. We use only one tag with the name of the worker:
+
+```csharp
+TagList = new TagList
+{
+    new("name", name)
+};
+```
+
+We use tags to subgroup counters. For example, in our example we attach a worker name to each of the counter, which allow us to view an amount of active instances with the given name as well as all active instances. You can use more than one tag, if you need it.
+
+#### Visualize the data
+
+Let's see, what we have now. Start the service and navigate to <http://localhost:5000/swagger>.
+
+Find a `Workers/Run` endpoint, expand it and click on `Try it out` button. Enter the worker name `workerA` in the field below and click `Execute` some times. Than change the name to the `workerB` and click again two or more times. Each time, when you click `Execute`, a new worker starts.
+
+![image](./images/run_worker.jpg)
+
+So, you have just started some workers named `workerA`, and some workers named `workerB`. After a while, each of them will be stopped. To see the dynamics of that process, open <http://localhost:9090> - the Prometheus console.
+
+Type `workers_active_count_items` in the Expression field and press `Execute` button (note, that you should switch to the `Graph` tab before). If you use the names, as I suggested, `workerA` and `workerB`, you will see two plots with different colors:
+
+![image](./images/workers.jpg)
+
+When you create a new worker the plot goes up, when a worker finishes its work the plot goes down.
+
+Prometheus provides a PromQL language to query data. You can learn more on the [official pages](https://prometheus.io/docs/prometheus/latest/querying/basics/). Here we will use one of them. One the plots above we've seen two distinct graphs. To see the whole amount of active workers type `sum(workers_active_count_items)` to the `Expression` field and click `Execute`:
+
+![image](./images/sum_of_workers.jpg)
