@@ -8,6 +8,12 @@ namespace otel_webapi_service.Controllers
     {
         static private List<byte[]> memoryBlocks = new List<byte[]>();
 
+        /// <summary>
+        /// Allocate a number of bytes in local process memory
+        /// </summary>
+        /// <param name="bytes">Number of bytes</param>
+        /// <param name="kbytes">Number of KBytes</param>
+        /// <param name="mbytes">Number of MBytes</param>
         [HttpPost("Allocate")]
         public IActionResult Allocate(int? bytes, int? kbytes, int? mbytes)
         {
@@ -19,6 +25,9 @@ namespace otel_webapi_service.Controllers
             return Ok($"Allocated {blockSize} bytes. Blocks count is {memoryBlocks.Count}");
         }
 
+        /// <summary>
+        /// Free all previously allocated memory
+        /// </summary>
         [HttpPost("FreeAll")]
         public IActionResult FreeAll()
         {
@@ -27,6 +36,11 @@ namespace otel_webapi_service.Controllers
             return Ok($"Blocks count is {memoryBlocks.Count}");
         }
 
+        /// <summary>
+        /// Free a memory block with the given index from 0 to N-1, where N is a number of allocated blocks
+        /// </summary>
+        /// <param name="index">Index of a memory block to free</param>
+        /// <returns></returns>
         [HttpPost("Free")]
         public IActionResult Free(int index)
         {
