@@ -14,6 +14,10 @@ namespace otel_webapi_service.Controllers
             Factory = factory;
         }
 
+        /// <summary>
+        /// Run a Worker with the given name. The Worker works in the background for the 0 - 120 seconds and than finishes.
+        /// </summary>
+        /// <param name="name"></param>
         [HttpPost("Run")]
         public IActionResult RunWorker(string name)
         {

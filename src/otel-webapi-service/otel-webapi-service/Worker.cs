@@ -16,6 +16,9 @@ namespace otel_webapi_service
             };
         }
 
+        /// <summary>
+        /// Run the worker for the 0-12 sec
+        /// </summary>
         public async Task Run()
         {
             await Task.Run(async () =>
