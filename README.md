@@ -4,7 +4,7 @@
 
 OpenTelemetry is a collection of tools, APIs, and SDKs. Use it to instrument, generate, collect, and export telemetry data (metrics, logs, and traces) to help you analyze your software's performance and behavior.
 
-If you are not familiar with the OpenTelemetry project, I strongly recommend you thoroughtly read the official documentation on the <https://opentelemetry.io/> to get a deep understanding of underlain concepts.
+If you are not familiar with the OpenTelemetry project, I strongly recommend you thoroughly read the official documentation on the <https://opentelemetry.io/> to get a deep understanding of underlain concepts.
 
 This repository is focused on metrics only and contains an example of a .Net 6 service instrumented with some useful metrics as well as a bunch of custom metrics. The service can be used as a quick start with the OpenTelemetry. Also, this README contains step-by-step instructions how to add and use OpenTelemetry metrics to your own service.
 
@@ -104,7 +104,7 @@ Basically, the reasons are:
 
 The alternatives you can find on [this](https://prometheus.io/docs/introduction/comparison/) page.
 
-#### Visualize data with the Prometheus
+#### Visualize Data With the Prometheus
 
 Let's begin. [Download the latest release](https://prometheus.io/download). Follow the [instruction](https://prometheus.io/docs/introduction/first_steps/) to configure and run it. You can use the simplest possible configuration file as following:
 
@@ -134,7 +134,7 @@ If you use a service example from this repo, you can play with `Memory/Allocate`
 
 ![image](./images/prometheus-3.jpg)
 
-### Add a custom counter
+### Add a Custom Counter
 
 I will use a sample service from this repository. To use a custom metric we need some steps:
 
@@ -144,7 +144,7 @@ I will use a sample service from this repository. To use a custom metric we need
 * use the counter;
 * visualize the data.
 
-#### Staff to be measured
+#### Staff to Be Measured
 
 To make the example more realistic, let's consider some workers. We can start the worker with given name. The worker do its job and after some time automatically finishes. We can run multiple workers and they will work in parallel.
 
@@ -170,9 +170,9 @@ The worker implementation is straightforward (see Worker.cs):
 
 We want to count the amount of active instances of workers as well as the amount of all created workers.
 
-#### The counter of workers
+#### A Counter of Workers
 
-We will use a class to gather all metrics together and will call it `Metrics` (see Metrics.cs).
+We will use a class to gather all metrics together and will call it `Metrics` (see [Metrics.cs](https://github.com/drwatson1/Otel-sandbox/blob/master/src/otel-webapi-service/otel-webapi-service/Metrics.cs)).
 
 First of all, we should create a `Meter` - something like a factory to create any metrics.
 
@@ -207,7 +207,7 @@ builder.Services.AddOpenTelemetryMetrics(builder =>
 
 Note the name of the added meter, it should be the same as used for your meter. You can add as many meters as you want. After the meter is added, all your counter are enabled by default and you can disable or enable each of them.
 
-#### Use the counter
+#### Use a Counter
 
 Using the counter is pretty simple. Let's return to our worker and add counters:
 
@@ -237,7 +237,7 @@ TagList = new TagList
 
 We use tags to subgroup counters. For example, in our example we attach a worker name to each of the counter, which allow us to view an amount of active instances with the given name as well as all active instances. You can use more than one tag, if you need it.
 
-#### Visualize the data
+#### Visualize the Data
 
 Let's see, what we have now. Start the service and navigate to <http://localhost:5000/swagger>.
 
@@ -256,3 +256,122 @@ When you create a new worker the plot goes up, when a worker finishes its work t
 Prometheus provides a PromQL language to query data. You can learn more on the [official pages](https://prometheus.io/docs/prometheus/latest/querying/basics/). Here we will use one of them. One the plots above we've seen two distinct graphs. To see the whole amount of active workers type `sum(workers_active_count_items)` to the `Expression` field and click `Execute`:
 
 ![image](./images/sum_of_workers.jpg)
+
+### Measure HTTP Requests Duration
+
+As we are creating a WebAPI service, one of the most interesting metrics can be an average response time. But we can't use counter to measure duration. OpenTelemetry DotNet implements only one option to measure duration - metrics with type `Histogram`. Basically, the `Histogram` metrics consists of a number of buckets as well as a sum and count of measurements. Please, read more about it [here](https://prometheus.io/docs/practices/histograms/).
+
+#### Instrument ASP.Net Core
+
+First, let's add a new metrics to measure response time. We will use the [OpenTelemetry.Instrumentation.AspNetCore](https://github.com/open-telemetry/opentelemetry-dotnet/tree/main/src/OpenTelemetry.Instrumentation.AspNetCore) package. It adds a new `http_server_duration` metrics which measure duration of each HTTP-request as `Histogram` metrics.
+
+Add [OpenTelemetry.Instrumentation.AspNetCore](https://github.com/open-telemetry/opentelemetry-dotnet/tree/main/src/OpenTelemetry.Instrumentation.AspNetCore) package to the project dependencies:
+
+```bash
+dotnet add package OpenTelemetry.Instrumentation.AspNetCore --version 1.0.0-rc9.4
+```
+
+Next, add corresponding services:
+
+```csharp
+builder.Services.AddOpenTelemetryMetrics(builder =>
+{
+    builder
+        .AddMeter("otel.webapi.service")
+        .AddAspNetCoreInstrumentation()  // <-- Add this line
+        .AddRuntimeInstrumentation()
+        .AddPrometheusExporter();
+});
+```
+
+Than, let's create something that we will monitor. We create a new controller `JobController` (see [JobController.cs](https://github.com/drwatson1/Otel-sandbox/blob/master/src/otel-webapi-service/otel-webapi-service/Controllers/JobController.cs)) and two end points: `RunLongJob` and `RunVeryLongJob`. The first one runs random time from 0 to 500 ms, the second - from 600 to 1000 ms:
+
+```csharp
+[HttpGet("RunLongJob")]
+public IActionResult RunLongJob()
+{
+    var delay = random.Next(500);
+    Thread.Sleep(delay);
+    return Ok($"The job takes {delay} msec");
+}
+
+[HttpGet("RunVeryLongJob")]
+public IActionResult RunVeryLongJob()
+{
+    var delay = random.Next(600, 1000);
+    Thread.Sleep(delay);
+    return Ok($"The job takes {delay} msec");
+}
+```
+
+As you can see we don't add a single line of code to measure duration because the [OpenTelemetry.Instrumentation.AspNetCore](https://github.com/open-telemetry/opentelemetry-dotnet/tree/main/src/OpenTelemetry.Instrumentation.AspNetCore) library measure it for us.
+
+Ok, now we are ready to see what we got.
+
+#### Query and Visualize Requests Duration
+
+Build and run the service. Navigate to <http://localhost:5000/swagger> page and make run each of `Job`'s endpoint some times with 10 to 20 seconds between clicks to emulate a bunch of pretty long running queries. Open the <http://localhost:9090> page in separate tabs, type `http_server_duration_ms_bucket` in `Expression` field and hit `Execute` button. You'll see something like the following:
+
+```plaintext
+http_server_duration_ms_bucket{http_flavor="HTTP/1.1", http_host="localhost:5000", http_method="GET", http_scheme="http", http_status_code="200", http_target="Job/RunLongJob", instance="localhost:5000", job="otel-webapi-service", le="+Inf"}
+95
+http_server_duration_ms_bucket{http_flavor="HTTP/1.1", http_host="localhost:5000", http_method="GET", http_scheme="http", http_status_code="200", http_target="Job/RunLongJob", instance="localhost:5000", job="otel-webapi-service", le="10"}
+2
+http_server_duration_ms_bucket{http_flavor="HTTP/1.1", http_host="localhost:5000", http_method="GET", http_scheme="http", http_status_code="200", http_target="Job/RunLongJob", instance="localhost:5000", job="otel-webapi-service", le="100"}
+14
+http_server_duration_ms_bucket{http_flavor="HTTP/1.1", http_host="localhost:5000", http_method="GET", http_scheme="http", http_status_code="200", http_target="Job/RunLongJob", instance="localhost:5000", job="otel-webapi-service", le="1000"}
+95
+```
+
+Each line represents a singe timeseries for our `http_server_duration_ms` metrics with attributes. The most interested attributes are `http_target` and `le`. The `http_target` is an endpoint which was requested. The `le` is an upper bound of a bucket. The value of the metrics is the amount of times when an HTTP requests duration fall into the corresponding bucket. By default, `http_server_duration_ms` metrics contains a bunch of pre-configured buckets, but you can change them, as we will see later.
+
+You can use filters to query the most interesting values, for example, try the expression:
+
+```plaintext
+http_server_duration_ms_bucket{http_target="Job/RunLongJob"}
+```
+
+or
+
+```plaintext
+http_server_duration_ms_bucket{http_target="Job/RunVeryLongJob"}
+```
+
+to see buckets only for the specified endpoint. You can use any attribute or much more tricky expressions with operators and functions. Some of them we will use later. 
+
+Try `http_server_duration_ms_sum` or `http_server_duration_ms_count` to see what happens.
+
+Note that these metrics are not a single value but a time-series, ever increasing over time. We can see that on a graph. Click on `Graph` tab and type:
+
+```plaintext
+http_server_duration_ms_sum{http_target=~"Job.*"}
+```
+
+Click `Execute` to see the result:
+
+![image](./images/durations.jpg)
+
+As you can see there are two plots for each of endpoints and all are increasing over time.
+
+Sometimes we need an aggregated value by all endpoints and we can easily done it using functions in an expression. In our case we can use `sum` function:
+
+```plaintext
+sum(http_server_duration_ms_sum{http_target=~"Job.*"})
+```
+
+![image](./images/Sum_of_durations.jpg)
+
+This is great, now we know how all that stuff works but it's not very useful from practical point of view.
+
+Usually we want to see an average server response time by endpoints, but averaging by all values is not that we want. Instead, we want values averaging by some sliding interval. Let's see, how we can do it. Average duration is sum of all durations divided by count of queries.
+
+Let's try this expression:
+
+```plaintext
+sum(rate(http_server_duration_ms_sum{http_target=~"Job.*"}[5m])) /
+sum(rate(http_server_duration_ms_count{http_target=~"Job.*"}[5m]))
+```
+
+![image](./images/average_duration.jpg)
+
+As earlier, we sum values by all our endpoints, but we can remove `sum` function to get distinct plots for each endpoint.

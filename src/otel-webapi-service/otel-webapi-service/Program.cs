@@ -32,6 +32,7 @@ builder.Services.AddOpenTelemetryMetrics(builder =>
     builder
         .AddMeter(metrics.Meter.Name)
         //.AddView(instrumentName: metrics.Workers.WorkTimeHist.Name, new ExplicitBucketHistogramConfiguration() { Boundaries = new double[] { 10 } })
+        .AddAspNetCoreInstrumentation()
         .AddRuntimeInstrumentation()
         .AddPrometheusExporter();
 });

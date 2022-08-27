@@ -7,7 +7,7 @@ namespace otel_webapi_service.Controllers
     [ApiController]
     public class JobController : ControllerBase
     {
-        static Random random = new Random();
+        static readonly Random random = new();
 
         /// <summary>
         /// The action synchronously runs a task for 0 - 500 msec before returns an answer
