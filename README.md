@@ -363,7 +363,7 @@ sum(http_server_duration_ms_sum{http_target=~"Job.*"})
 
 This is great, now we know how all that stuff works but it's not very useful from practical point of view.
 
-Usually we want to see an average server response time by endpoints, but averaging by all values is not that we want. Instead, we want values averaging by some sliding interval. Let's see, how we can do it. Average duration is sum of all durations divided by count of queries.
+Usually we want to see an average server response time by endpoints, but averaging by all values over time is not that we want. Instead, we want values averaging by some sliding time-window. Let's see, how we can do it. Average duration is sum of all durations divided by count of queries.
 
 Let's try this expression:
 
