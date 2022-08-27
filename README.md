@@ -375,3 +375,109 @@ sum(rate(http_server_duration_ms_count{http_target=~"Job.*"}[5m]))
 ![image](./images/average_duration.jpg)
 
 As earlier, we sum values by all our endpoints, but we can remove `sum` function to get distinct plots for each endpoint.
+
+TDB Custom Histogram
+
+## Monitoring Linux Host Metrics
+
+Very often we need to monitor basic host parameters where your application works, such as CPU usage, memory consumptions or available disk free space. This is extremely ease to do with the Prometheus and Node Exporter. For more information see [step-by-step](https://prometheus.io/docs/guides/node-exporter/) guide.
+
+### Install and Run Node Exporter
+
+Download the [latest version](https://github.com/prometheus/node_exporter/releases/latest) of the Node Exporter for your OS. Unpack `node_exporter` file from the `tar.gz` archive, place it somewhere on the host which you will monitor and run it.
+
+You can read more on its [GitHub page](https://github.com/prometheus/node_exporter/) about all configuration options but for our purposes it will be enough.
+
+Go to the Prometheus folder on your local host and add a new job to gather statistics from Node Exporter:
+
+```yaml
+...skipped
+
+scrape_configs:
+  - job_name: Otel-web-api-service
+    static_configs:
+      - targets: ["localhost:5000"]
+  - job_name: web-api-service-node-exporter # <-- Add a new job
+    static_configs:
+      - targets: ["IP-address:9100"]
+```
+
+Of course, you should specify your monitored host's IP-address. By default, Node Exporter uses port 9100.
+
+Restart the Prometheus. That's all!
+
+Now, let's explore what we've got.
+
+### Host metrics
+
+All metrics, which Node Exporter exposes have `node_` prefix. The list of all metrics you'll find on [GitHub](https://github.com/prometheus/node_exporter#collectors).
+
+Let's see the most interesting metrics.
+
+#### CPU usage
+
+In the `Expression` field type:
+
+```plaintext
+sum(rate(node_cpu_seconds_total{mode=~"system|user"}[1m])) by (cpu)
+```
+
+and click `Execute` button or just press `Enter`. Click on `Graph` tab to see something like this:
+
+![image](./images/cpu_usage.jpg)
+
+To see the same graph you should click to `Show stacked graph` state button.
+
+Here you see CPU usage by individual cores, to see the whole CPU utilization remove `by (cpu)` at the end of the expression. The `[1m]` part of the expression means that the CPU usage is aggregated by 1 minute. You can use [other](https://prometheus.io/docs/prometheus/latest/querying/basics/#time-durations) intervals.
+
+The next one is a disk free space or disk usage. Node Exporter do not expose disk usage, but instead it expose the whole disk size and available bytes. We can combine them to get what we want. Type the following expression:
+
+```text
+(node_filesystem_size_bytes - node_filesystem_avail_bytes)/node_filesystem_size_bytes
+```
+
+In my case, I see the following:
+
+```text
+{device="/dev/mmcblk0p1", fstype="ext4", instance="192.168.3.76:9100", job="3.76", mountpoint="/"}
+0.9683696202749889
+{device="/dev/sda1", fstype="ext4", instance="192.168.3.76:9100", job="3.76", mountpoint="/home/data"}
+0.9142943061977846
+{device="tmpfs", fstype="tmpfs", instance="192.168.3.76:9100", job="3.76", mountpoint="/run"}
+0.005465893342506119
+{device="tmpfs", fstype="tmpfs", instance="192.168.3.76:9100", job="3.76", mountpoint="/run/lock"}
+0.00078125
+{device="tmpfs", fstype="tmpfs", instance="192.168.3.76:9100", job="3.76", mountpoint="/run/user/1001"}
+0
+```
+
+Very informative! If your service consume a lot of disk space you can use graphs to monitor a disk consumption.
+
+The next popular metrics are memory and swap usage. There are many memory related metrics but the most useful are:
+
+* node_memory_MemTotal_bytes
+* node_memory_MemAvailable_bytes
+* node_memory_MemFree_bytes
+
+Let's see memory usage:
+
+```text
+(node_memory_MemTotal_bytes - node_memory_MemFree_bytes)/node_memory_MemTotal_bytes
+```
+
+If we switch to the `Graph` tab we see the picture:
+
+![image](./images/mem_usage.jpg)
+
+The last portion of metrics is swap usage. It's mostly the same as memory metrics^
+
+* node_memory_SwapTotal_bytes
+* node_memory_SwapFree_bytes
+
+Use the expression to see the swap consumption:
+
+```text
+(node_memory_SwapTotal_bytes - node_memory_SwapFree_bytes)/node_memory_SwapTotal_bytes
+```
+
+![image](./images/swap_usage.jpg)
