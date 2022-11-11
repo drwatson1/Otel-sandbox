@@ -8,6 +8,37 @@ If you are not familiar with the OpenTelemetry project, I strongly recommend you
 
 This repository is focused on metrics only and contains an example of a .Net 6 service instrumented with some useful metrics as well as a bunch of custom metrics. The service can be used as a quick start with the OpenTelemetry. Also, this README contains step-by-step instructions how to add and use OpenTelemetry metrics to your own service.
 
+## Concepts
+
+### Metrics
+
+The OpenTelemetry defines three metric instruments:
+
+- counter: a value that is summed over time – you can think of this like an odometer on a car; it only ever goes up.
+- measure: a value that is aggregated over time. This is more akin to the trip odometer on a car, it represents a value over some defined range.
+- observer: captures a current set of values at a particular point in time, like a fuel gauge in a vehicle.
+
+Each of them is intended for specific goal and you should thoughtfully select them dependent of your purpose. For example, you can use counter to summarize the overall amount of bytes written on disk, observer to get memory consumption over time, or measure to get understanding of your REST API performance when you want to know a distribution of API requests' execution latency.
+
+The current implementation for .Net gives you classes for each of metrics types - Counter, Histogram and ObservableGauge respectively.
+
+### Metrics and Timeseries
+
+Our metrics changes over time, so we can't store just a single value. We should store each metric values as a sequence of pairs consist of value and correspondent time named timeseries.
+When you add a new metric to your application you typically specify its name, unit of measurement, value type and attributes (a.k.a. dimensions). Each unique combination of these properties comprise a distinct timeseries. You can think about timeseries as a tables in a database. You should maintain a reasonable amount of timeseries and should not allow the amount ever grow (see below for details).
+
+### Metrics Names and Attributes (or Labels)
+
+When you start using metrics they tend to quickly grow in amount, so to make them more maintainable and understandable by others you should use naming conventions. A short list of useful conventions you can find on the page [Metric and Label Naming](https://prometheus.io/docs/practices/naming/) of Prometheus documentation. Carefully select names for your metrics.
+
+Use attributes to differentiate metrics. Attribute is a key-value pair. For example, instead of create distinct metrics for each of a service endpoint (add_user_requests_total, get_users_requests_total and so on) you can use single metric "requests_total" with attribute "endpoint" with values "add_user",  "get_users" and so on.
+
+Remember, that each new attribute value yields a new time series. Metric can have more than one attribute and in this case, each new combination of attributes values will create a new series. This means that you should use a limited amount of values for attributes. For example, you can use metric "cpu_seconds" with "core"="1", "core"="2" attributes, but you should avoid using attribute, something like "temperature"="20.6", "temperature"="14.2" because temperature can have a huge amount of values. If do so this explode Prometheus very quickly, because you create this way an ever growing amount of timeseries.
+
+### Histograms
+
+Histograms deserve a separate discussion. TBD
+
 ## Step-by-step Guide
 
 ### 1. Create a New Service and Configure OpenTelemetry
