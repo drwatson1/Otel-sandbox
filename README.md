@@ -24,16 +24,15 @@ The current implementation for .Net gives you classes for each of metrics types 
 
 ### Metrics and Timeseries
 
-Our metrics changes over time, so we can't store just a single value. We should store each metric values as a sequence of pairs consist of value and correspondent time named timeseries.
-When you add a new metric to your application you typically specify its name, unit of measurement, value type and attributes (a.k.a. dimensions). Each unique combination of these properties comprise a distinct timeseries. You can think about timeseries as a tables in a database. You should maintain a reasonable amount of timeseries and should not allow the amount ever grow (see below for details).
+Our metrics changes over time, so we can't store just a single value. We should store each metric values as a sequence of pairs consist of value and correspondent time. These sequences are named timeseries. When you add a new metric to your application you typically specify its name, unit of measurement, value type and attributes (a.k.a. dimensions). Each unique combination of these properties comprise a distinct timeseries. You can think about the timeseries as tables in a database. You should maintain a reasonable amount of timeseries and should not allow the amount ever grow (see below for details).
 
 ### Metrics Names and Attributes (or Labels)
 
 When you start using metrics they tend to quickly grow in amount, so to make them more maintainable and understandable by others you should use naming conventions. A short list of useful conventions you can find on the page [Metric and Label Naming](https://prometheus.io/docs/practices/naming/) of Prometheus documentation. Carefully select names for your metrics.
 
-Use attributes to differentiate metrics. Attribute is a key-value pair. For example, instead of create distinct metrics for each of a service endpoint (add_user_requests_total, get_users_requests_total and so on) you can use single metric "requests_total" with attribute "endpoint" with values "add_user",  "get_users" and so on.
+To reduce number of metrics use attributes to differentiate them instead of distinct metrics. Attribute is a key-value pair, metric can have any number of attributes. For example, instead of create distinct metrics for each of a service endpoint (add_user_requests_total, get_users_requests_total and so on) you can use single metric "requests_total" with attribute "endpoint" with values "add_user",  "get_users" and so on. Moreover, you can add "verb" attribute with values "POST", "GET" and so on to get more detailed information. In other case should have to use a combination of metrics for each of the endpoints and verbs.
 
-Remember, that each new attribute value yields a new time series. Metric can have more than one attribute and in this case, each new combination of attributes values will create a new series. This means that you should use a limited amount of values for attributes. For example, you can use metric "cpu_seconds" with "core"="1", "core"="2" attributes, but you should avoid using attribute, something like "temperature"="20.6", "temperature"="14.2" because temperature can have a huge amount of values. If do so this explode Prometheus very quickly, because you create this way an ever growing amount of timeseries.
+Remember, that each new attribute value yields a new time series. Metric can have more than one attribute and each new combination of attributes values will create a new timeseries. This means that you should use a limited amount of values for attributes. For example, you can use a metric "cpu_seconds" with "core"="1", "core"="2" attributes, but you should avoid using attribute, something like "temperature"="20.6", "temperature"="14.2" because temperature can have a huge amount of values. If you do so this explode Prometheus very quickly, because you create this way an ever growing amount of timeseries.
 
 ### Histograms
 
