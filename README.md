@@ -156,7 +156,7 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: "Otel-web-api-service"
+  - job_name: "otel-web-api-service"
     static_configs:
       - targets: ["localhost:5000"]
 ```
@@ -418,7 +418,51 @@ sum(rate(http_server_duration_ms_count{http_target=~"Job.*"}[5m]))
 
 As earlier, we sum values by all our endpoints, but we can remove `sum` function to get distinct plots for each endpoint.
 
-TDB Custom Histogram
+### Add a Custom Histogram
+
+Let's add a custom histogram. This is as simple as the counter which we added recently. For example, we have some internal operation and we want to know an average duration of that operation.
+
+First, create a histogram:
+
+```csharp
+public Histogram<long> OperationDuration { get; }
+
+public Metrics()
+{
+    // ... other code
+    OperationDuration = Meter.CreateHistogram<long>("otel-operation-duration", "ms", "Operation duration");
+}
+```
+
+Note, that here we step back from naming conventions which I've mentioned earlier, and use `ms` instead of seconds, but in this case I believe this convenient. Note also, that an actual names of metrics, which you will see in the Prometheus will be `otel_operation_duration_ms_count`, `otel_operation_duration_ms_sum` and `otel_operation_duration_ms_bucket`.
+
+Then, use it:
+
+```csharp
+Metrics.OperationDuration.Record(duration_ms);
+```
+
+Extremely easy!
+
+Let's try it in practice and see what we'll get. You'll find the source code in `Metrics.cs` and `Controllers/OperationController.cs` files. Just build and run the project, open <http://localhost:5000/swagger>, expand `GET /Operation/Run` action, click on `Try it out` and `Execute` some times to generate metrics. Then open Prometheus console and type `otel_operation_duration_ms_bucket` and hit `Execute`. On the Table tab you should see something like that:
+
+![image](./images/hist_buckets_table.jpg)
+
+As I've mentioned earlier, here we see a bunch of timeseries with different `le` attribute values. Also, you can notice, that the values are increased from `le=0` to `le=+Inf`. The distribution which you see here is a default distribution, but if it is not convenient for you you can change it as you will. To do that you should add a `AddView` extension method call to AddOpenTelemetryMetrics:
+
+```csharp
+builder.Services.AddOpenTelemetryMetrics(builder =>
+{
+    builder
+        // all other configuration
+        .AddView(instrumentName: metrics.OperationDuration.Name, new ExplicitBucketHistogramConfiguration() 
+        { 
+            Boundaries = new long[] { 0, 10, 100, 1000, 10000, 100000 }
+        })
+});
+```
+
+As you see here, you specify buckets for each individual metric.
 
 ## Monitoring Linux Host Metrics
 
