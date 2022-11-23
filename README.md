@@ -156,7 +156,7 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: "otel-web-api-service"
+  - job_name: "otel-webapi-service"
     static_configs:
       - targets: ["localhost:5000"]
 ```
@@ -175,6 +175,18 @@ Select `Graph` tab:
 If you use a service example from this repo, you can play with `Memory/Allocate`, `Memory/Free` and `Memory/FreeAll` endpoints to allocate and free memory to see how it influences to the plot:
 
 ![image](./images/prometheus-3.jpg)
+
+### Notes About .Net Implementation
+
+Metrics is a part of .Net ecosystem. In .Net 3.1 it was supplied as a NuGet package but starting from version 6 it is included by default.
+
+Microsoft recommends to use metrics names using '-' in code if a separator is needed, and let the metric consumer such as Prometheus convert to an alternate separator if needed. 
+
+Also, when you use unit for your metric, it is added automatically to metric name. For example, when you use 'otel-operation-duration' metric name with the unit 'ms' you get a timeseries 'otel_operation_duration_ms' in Prometheus. This means that you don't need to add a unit to metric name, use 'unit' parameter in factory methods such as 'CreateCounter' or 'CreateHistogram'. We will see an example below.
+
+One more convention for a Meter name. Use a dotted hierarchical name that contains the assembly name and optionally a subcomponent name. You should create Meter once and use it as long as needed but you should consider a new Meter rather than reusing an existing one if you want to being able to enable and disable the groups of metrics separately, for distinct subcomponents, for example.
+
+I strongly recommend to read [Metrics Instrumentation](https://learn.microsoft.com/en-us/dotnet/core/diagnostics/metrics-instrumentation) article to learn more about .Net implementation and best practices. This can get rid you of any confusions when use .Net metrics.
 
 ### Add a Custom Counter
 
@@ -219,15 +231,15 @@ We will use a class to gather all metrics together and will call it `Metrics` (s
 First of all, we should create a `Meter` - something like a factory to create any metrics.
 
 ```csharp
-public Meter Meter { get; } = new Meter("otel_webapi_service", "1.0");
+public Meter Meter { get; } = new Meter("otel-webapi-service", "1.0");
 ```
 
 Our meter contains a name and version. This name we will use later.
 Next, we create counters:
 
 ```csharp
-ActiveInstances = meter.CreateCounter<long>("otel_workers_active_instances_total", "items", "Number of active workers");
-Count = meter.CreateCounter<long>("otel_workers_total", "items",  "Number of created workers");
+ActiveInstances = meter.CreateCounter<long>("otel-workers-active-instances-total", null, "Number of active workers");
+Count = meter.CreateCounter<long>("otel-workers-total", null,  "Number of created workers");
 ```
 
 Each counter should have a mandatory name and optional unit and description.
@@ -241,7 +253,7 @@ Each counter is associated with its correspondent `Meter`. To make counters work
 builder.Services.AddOpenTelemetryMetrics(builder =>
 {
     builder
-        .AddMeter("otel_webapi_service")    // <---- Add this line
+        .AddMeter("otel-webapi-service")    // <---- Add this line
         .AddRuntimeInstrumentation()  
         .AddPrometheusExporter();
 });
@@ -319,7 +331,7 @@ Next, add corresponding services:
 builder.Services.AddOpenTelemetryMetrics(builder =>
 {
     builder
-        .AddMeter("otel_webapi_service")
+        .AddMeter("otel-webapi-service")
         .AddAspNetCoreInstrumentation()  // <-- Add this line
         .AddRuntimeInstrumentation()
         .AddPrometheusExporter();
@@ -486,7 +498,7 @@ Go to the Prometheus folder on your local host and add a new job to gather stati
 ...skipped
 
 scrape_configs:
-  - job_name: otel-web-api-service
+  - job_name: otel-webapi-service
     static_configs:
       - targets: ["localhost:5000"]
   - job_name: node-exporter # <-- Add a new job
