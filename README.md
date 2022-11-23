@@ -36,8 +36,19 @@ Remember, that each new attribute value yields a new time series. Metric can hav
 
 ### Histograms
 
-Histograms deserve a separate discussion. TBD
-<https://prometheus.io/docs/practices/histograms/>
+Histograms deserve a separate discussion. They allow you to calculate averages for observed values and some derived measures, for example, quantiles. Typically, they are used to track the number of observations and the sum of observed values. The examples are requests durations, response sizes, temperature and so on.
+
+Technically, in the Prometheus histogram is represented with a bunch of counter with suffixes `_count`, `_sum` and `_bucket`. The first two of them are the number and sum of observations and behave as counters, so you can use them to calculate average:
+
+```
+  rate(http_request_duration_seconds_sum[5m])
+/
+  rate(http_request_duration_seconds_count[5m])
+```
+
+Each `_bucket` timeseries contains `le` attribute that gives a value distribution between fixed buckets. Inherently, the bucket is also a counter which contains a number of observations with a value is less or equal `le` attribute value. Note, that the histogram is cumulative, i.e. bucket with `le = 5` will always contain observations from bucket with `le = 3`. Typically, distribution observations over buckets is implemented on client. When we talk about .Net implementation of histogram, then we can use a default distribution or customize it (see below).
+
+You can learn more on the [Prometheus documentation page](https://prometheus.io/docs/practices/histograms/).
 
 ## Step-by-step Guide
 
