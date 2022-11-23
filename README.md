@@ -6,7 +6,7 @@ OpenTelemetry is a collection of tools, APIs, and SDKs. Use it to instrument, ge
 
 If you are not familiar with the OpenTelemetry project, I strongly recommend you thoroughly read the official documentation on the <https://opentelemetry.io/> to get a deep understanding of underlain concepts.
 
-This repository is focused on metrics only and contains an example of a .Net 6 service instrumented with some useful metrics as well as a bunch of custom metrics. The service can be used as a quick start with the OpenTelemetry. Also, this README contains step-by-step instructions how to add and use OpenTelemetry metrics to your own service.
+This repository is focused on metrics only. It gives you a quick introduction in metrics concepts, if you are not familiar with, and a practical step-by-step guide how to use metrics in your projects as well as how to gather, store, query and visualize them with Prometheus. Also, it shows you how to simply add monitoring of your host with Node Exporter, if your are already using Prometheus. The repository contains a source code of a .Net 6 service instrumented with some useful metrics as well as a bunch of custom metrics. The service can be used as a starting point for your own services with the OpenTelemetry.
 
 ## Concepts
 
@@ -37,6 +37,7 @@ Remember, that each new attribute value yields a new time series. Metric can hav
 ### Histograms
 
 Histograms deserve a separate discussion. TBD
+<https://prometheus.io/docs/practices/histograms/>
 
 ## Step-by-step Guide
 
@@ -54,7 +55,7 @@ dotnet add package OpenTelemetry.Exporter.Prometheus --version 1.3.0-rc.2
 
 The first two packages is mandatory and contains core components.
 
-The last added package is `OpenTelemetry.Exporter.Prometheus`. It's a so called `exporter`. Exporters are used to gather and pass all metrics to a backend to collect, store and query them. Typically, we want to use a time-series database as the backend. Of course, you can use console exporter, but we use `Prometheus` (see below) in this example as much more useful one. You can read more about exporters on [this](https://opentelemetry.io/docs/instrumentation/net/exporters/) page.
+The last added package is `OpenTelemetry.Exporter.Prometheus`. It's a so called `exporter`. Exporters are used to gather and pass all metrics to a backend to collect, store and query them. Typically, we want to use a time-series database as a backend. Of course, you can use a console exporter, but we will use `Prometheus` (see below) in this example as much more useful one. You can read more about exporters on [this](https://opentelemetry.io/docs/instrumentation/net/exporters/) page.
 
 In your `Program.cs` add the following code to add all necessary services:
 
@@ -67,7 +68,7 @@ builder.Services.AddOpenTelemetryMetrics(builder =>
 });
 ```
 
-Here, we add a new `Meter` with `otel-webapi-service` name and all necessary for the exporter. Then enable the Prometheus exporter:
+Then enable the Prometheus exporter:
 
 ```csharp
 // Configure Prometheus exporter
@@ -77,7 +78,7 @@ app.UseOpenTelemetryPrometheusScrapingEndpoint();
 It automatically adds a new endpoint `/metrics` which can be used to get metrics.
 Build and start your service, open a browser and navigate to `http://localhost:5000/metrics` to see your service metrics. Note! The port can other than `5000`, so please, don't forget to use a right one.
 
-Do you see anything? No, you don't. This is because we didn't add any metrics. Let's do it.
+Do you see anything? No, you don't. This is because we didn't add any metrics. Let's add some.
 
 ### 2. Add a Basic Telemetry
 
@@ -121,16 +122,16 @@ We will use [Prometheus](https://prometheus.io/) to collect metrics which our se
 
 #### What is the Prometheus?
 
-It's an open-source time-series database with alerting and query language.
+It's an open-source timeseries database with alerting and query language.
 
 #### Why is the Prometheus?
 
 Basically, the reasons are:
 
-* Simple installation
-* Very fast
-* Low resource consumption
-* Rich query language and integrated data visualization
+- Simple installation
+- Very fast
+- Low resource consumption
+- Rich query language and integrated data visualization
 
 The alternatives you can find on [this](https://prometheus.io/docs/introduction/comparison/) page.
 
@@ -168,17 +169,17 @@ If you use a service example from this repo, you can play with `Memory/Allocate`
 
 I will use a sample service from this repository. To use a custom metric we need some steps:
 
-* some stuff, which we want to measure;
-* the counter as itself;
-* enable our counters;
-* use the counter;
-* visualize the data.
+- some stuff, which we want to measure;
+- the counter itself;
+- enable the counter;
+- use the counter;
+- visualize the data.
 
-#### Staff to Be Measured
+#### Stuff To Be Measured
 
-To make the example more realistic, let's consider some workers. We can start the worker with given name. The worker do its job and after some time automatically finishes. We can run multiple workers and they will work in parallel.
+To make the example more realistic, let's consider some worker. We can start the worker with a given name. The worker does its job and after some time automatically finishes. We can run multiple workers and they will work simultaneous.
 
-The worker implementation is straightforward (see Worker.cs):
+The worker implementation is straightforward (see `Worker.cs`):
 
 ```csharp
     public class Worker
@@ -207,15 +208,15 @@ We will use a class to gather all metrics together and will call it `Metrics` (s
 First of all, we should create a `Meter` - something like a factory to create any metrics.
 
 ```csharp
-public Meter Meter { get; } = new Meter("otel.webapi.service", "1.0");
+public Meter Meter { get; } = new Meter("otel_webapi_service", "1.0");
 ```
 
-Our meter contains some name and version. This name we will use later.
+Our meter contains a name and version. This name we will use later.
 Next, we create counters:
 
 ```csharp
-ActiveInstances = meter.CreateCounter<long>("workers.active_count", "items", "Number of active workers");
-Count = meter.CreateCounter<long>("workers.count", "items",  "Number of created workers");
+ActiveInstances = meter.CreateCounter<long>("otel_workers_active_instances_total", "items", "Number of active workers");
+Count = meter.CreateCounter<long>("otel_workers_total", "items",  "Number of created workers");
 ```
 
 Each counter should have a mandatory name and optional unit and description.
@@ -229,13 +230,13 @@ Each counter is associated with its correspondent `Meter`. To make counters work
 builder.Services.AddOpenTelemetryMetrics(builder =>
 {
     builder
-        .AddMeter("otel.webapi.service")    // <---- Add this line
+        .AddMeter("otel_webapi_service")    // <---- Add this line
         .AddRuntimeInstrumentation()  
         .AddPrometheusExporter();
 });
 ```
 
-Note the name of the added meter, it should be the same as used for your meter. You can add as many meters as you want. After the meter is added, all your counter are enabled by default and you can disable or enable each of them.
+Note the name of the added meter, it should be the same as used for your meter. You can add as many meters as you want. After the meter is added, all your counters will be enabled by default and you will be able disable or enable each of them.
 
 #### Use a Counter
 
@@ -256,7 +257,7 @@ public async Task Run()
 }
 ```
 
-As you can see, you a counter allow you add or remove any value and attach tags to the counters. Tag is a simple key-value pair. We use only one tag with the name of the worker:
+As you can see, the counter allow you add or remove any value and attach tags to the counters. Tag is a simple key-value pair. We use only one tag with the name of the worker:
 
 ```csharp
 TagList = new TagList
@@ -265,7 +266,7 @@ TagList = new TagList
 };
 ```
 
-We use tags to subgroup counters. For example, in our example we attach a worker name to each of the counter, which allow us to view an amount of active instances with the given name as well as all active instances. You can use more than one tag, if you need it.
+We use tags to group counters. For example, in our example we attach a worker name to each of the counter, which allow us to view an amount of active instances with the given name as well as all active instances. You can use more than one tag, if you need it.
 
 #### Visualize the Data
 
@@ -277,13 +278,13 @@ Find a `Workers/Run` endpoint, expand it and click on `Try it out` button. Enter
 
 So, you have just started some workers named `workerA`, and some workers named `workerB`. After a while, each of them will be stopped. To see the dynamics of that process, open <http://localhost:9090> - the Prometheus console.
 
-Type `workers_active_count_items` in the Expression field and press `Execute` button (note, that you should switch to the `Graph` tab before). If you use the names, as I suggested, `workerA` and `workerB`, you will see two plots with different colors:
+Type `otel_workers_active_instances_total` in the Expression field and press `Execute` button (note, that you should switch to the `Graph` tab before). If you use the names, as I suggested, `workerA` and `workerB`, you will see two plots with different colors:
 
 ![image](./images/workers.jpg)
 
-When you create a new worker the plot goes up, when a worker finishes its work the plot goes down.
+When you create a new worker the plot goes up, when a worker finishes its working the plot goes down.
 
-Prometheus provides a PromQL language to query data. You can learn more on the [official pages](https://prometheus.io/docs/prometheus/latest/querying/basics/). Here we will use one of them. One the plots above we've seen two distinct graphs. To see the whole amount of active workers type `sum(workers_active_count_items)` to the `Expression` field and click `Execute`:
+Prometheus provides a PromQL language to query data. You can learn more on the [official pages](https://prometheus.io/docs/prometheus/latest/querying/basics/). Here we will use one of them. On the plots above we've seen two distinct graphs for each of the names `workerA` and `workerB`. To see the total amount of active workers type `sum(otel_workers_active_instances_total)` to the `Expression` field and click `Execute`:
 
 ![image](./images/sum_of_workers.jpg)
 
@@ -307,7 +308,7 @@ Next, add corresponding services:
 builder.Services.AddOpenTelemetryMetrics(builder =>
 {
     builder
-        .AddMeter("otel.webapi.service")
+        .AddMeter("otel_webapi_service")
         .AddAspNetCoreInstrumentation()  // <-- Add this line
         .AddRuntimeInstrumentation()
         .AddPrometheusExporter();
@@ -334,13 +335,13 @@ public IActionResult RunVeryLongJob()
 }
 ```
 
-As you can see we don't add a single line of code to measure duration because the [OpenTelemetry.Instrumentation.AspNetCore](https://github.com/open-telemetry/opentelemetry-dotnet/tree/main/src/OpenTelemetry.Instrumentation.AspNetCore) library measure it for us.
+As you can see we don't add a single line of code to measure duration because the [OpenTelemetry.Instrumentation.AspNetCore](https://github.com/open-telemetry/opentelemetry-dotnet/tree/main/src/OpenTelemetry.Instrumentation.AspNetCore) library measures it for us.
 
 Ok, now we are ready to see what we got.
 
 #### Query and Visualize Requests Duration
 
-Build and run the service. Navigate to <http://localhost:5000/swagger> page and make run each of `Job`'s endpoint some times with 10 to 20 seconds between clicks to emulate a bunch of pretty long running queries. Open the <http://localhost:9090> page in separate tabs, type `http_server_duration_ms_bucket` in `Expression` field and hit `Execute` button. You'll see something like the following:
+Build and run your service. Navigate to <http://localhost:5000/swagger> page and make run each of `Job`'s endpoint some times with 10 to 20 seconds between clicks to emulate a bunch of pretty long running queries. Open the <http://localhost:9090> page in a separate browser tab, type `http_server_duration_ms_bucket` in the `Expression` field and hit `Execute` button. You'll see something like the following:
 
 ```plaintext
 http_server_duration_ms_bucket{http_flavor="HTTP/1.1", http_host="localhost:5000", http_method="GET", http_scheme="http", http_status_code="200", http_target="Job/RunLongJob", instance="localhost:5000", job="otel-webapi-service", le="+Inf"}
@@ -353,7 +354,7 @@ http_server_duration_ms_bucket{http_flavor="HTTP/1.1", http_host="localhost:5000
 95
 ```
 
-Each line represents a singe timeseries for our `http_server_duration_ms` metrics with attributes. The most interested attributes are `http_target` and `le`. The `http_target` is an endpoint which was requested. The `le` is an upper bound of a bucket. The value of the metrics is the amount of times when an HTTP requests duration fall into the corresponding bucket. By default, `http_server_duration_ms` metrics contains a bunch of pre-configured buckets, but you can change them, as we will see later.
+Each line represents a singe timeseries for our `http_server_duration_ms` metric with attributes. The most interested attributes are `http_target` and `le`. The `http_target` is an endpoint which was requested. The `le` is an upper bound of a bucket. The value of the metrics is the amount of times when an HTTP requests duration fall into the corresponding bucket. By default, `http_server_duration_ms` metrics contains a bunch of pre-configured buckets, but you can change them, as we will see later (??? TBD).
 
 You can use filters to query the most interesting values, for example, try the expression:
 
@@ -367,11 +368,11 @@ or
 http_server_duration_ms_bucket{http_target="Job/RunVeryLongJob"}
 ```
 
-to see buckets only for the specified endpoint. You can use any attribute or much more tricky expressions with operators and functions. Some of them we will use later. 
+to see buckets only for the specified endpoint. You can use any attribute or much more tricky expressions with operators and functions. Some of them we will use later.
 
 Try `http_server_duration_ms_sum` or `http_server_duration_ms_count` to see what happens.
 
-Note that these metrics are not a single value but a time-series, ever increasing over time. We can see that on a graph. Click on `Graph` tab and type:
+Note that these metrics are not a single value but a timeseries, ever increasing over time. We can see that on a graph. Click on `Graph` tab and type:
 
 ```plaintext
 http_server_duration_ms_sum{http_target=~"Job.*"}
@@ -383,7 +384,7 @@ Click `Execute` to see the result:
 
 As you can see there are two plots for each of endpoints and all are increasing over time.
 
-Sometimes we need an aggregated value by all endpoints and we can easily done it using functions in an expression. In our case we can use `sum` function:
+Sometimes we need an aggregated value by all endpoints and we can easily done this by using functions in an expression. In our case we can use `sum` function:
 
 ```plaintext
 sum(http_server_duration_ms_sum{http_target=~"Job.*"})
@@ -391,7 +392,7 @@ sum(http_server_duration_ms_sum{http_target=~"Job.*"})
 
 ![image](./images/Sum_of_durations.jpg)
 
-This is great, now we know how all that stuff works but it's not very useful from practical point of view.
+Great, now we know how all that stuff works but it's not very useful from practical point of view.
 
 Usually we want to see an average server response time by endpoints, but averaging by all values over time is not that we want. Instead, we want values averaging by some sliding time-window. Let's see, how we can do it. Average duration is sum of all durations divided by count of queries.
 
@@ -410,7 +411,7 @@ TDB Custom Histogram
 
 ## Monitoring Linux Host Metrics
 
-Very often we need to monitor basic host parameters where your application works, such as CPU usage, memory consumptions or available disk free space. This is extremely ease to do with the Prometheus and Node Exporter. For more information see [step-by-step](https://prometheus.io/docs/guides/node-exporter/) guide.
+Very often we need to monitor basic host parameters where your application works, such as CPU usage, memory consumptions or available disk free space. This is extremely easy to do with the Prometheus and Node Exporter. For more information see [step-by-step](https://prometheus.io/docs/guides/node-exporter/) guide.
 
 ### Install and Run Node Exporter
 
@@ -424,10 +425,10 @@ Go to the Prometheus folder on your local host and add a new job to gather stati
 ...skipped
 
 scrape_configs:
-  - job_name: Otel-web-api-service
+  - job_name: otel-web-api-service
     static_configs:
       - targets: ["localhost:5000"]
-  - job_name: web-api-service-node-exporter # <-- Add a new job
+  - job_name: node-exporter # <-- Add a new job
     static_configs:
       - targets: ["IP-address:9100"]
 ```
@@ -485,9 +486,9 @@ Very informative! If your service consume a lot of disk space you can use graphs
 
 The next popular metrics are memory and swap usage. There are many memory related metrics but the most useful are:
 
-* node_memory_MemTotal_bytes
-* node_memory_MemAvailable_bytes
-* node_memory_MemFree_bytes
+- node_memory_MemTotal_bytes
+- node_memory_MemAvailable_bytes
+- node_memory_MemFree_bytes
 
 Let's see memory usage:
 
@@ -499,10 +500,10 @@ If we switch to the `Graph` tab we see the picture:
 
 ![image](./images/mem_usage.jpg)
 
-The last portion of metrics is swap usage. It's mostly the same as memory metrics^
+The last portion of metrics is swap usage. It's mostly the same as memory metrics:
 
-* node_memory_SwapTotal_bytes
-* node_memory_SwapFree_bytes
+- node_memory_SwapTotal_bytes
+- node_memory_SwapFree_bytes
 
 Use the expression to see the swap consumption:
 
