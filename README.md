@@ -36,9 +36,9 @@ Remember, that each new attribute value yields a new time series. Metric can hav
 
 ### Histograms
 
-Histograms deserve a separate discussion. They allow you to calculate averages for observed values and some derived measures, for example, quantiles. Typically, they are used to track the number of observations and the sum of observed values. The examples are requests durations, response sizes, temperature and so on.
+Histograms deserve a separate discussion. They allow you to calculate averages for observed values as well as some derived measures, for example, quantiles. Typically, they are used to track the number of observations and the sum of observed values. The examples are requests durations, response sizes, temperature and so on.
 
-Technically, in the Prometheus histogram is represented with a bunch of counter with suffixes `_count`, `_sum` and `_bucket`. The first two of them are the number and sum of observations and behave as counters, so you can use them to calculate average:
+Technically, in the Prometheus histogram is represented with a bunch of counter with suffixes `_count`, `_sum` and `_bucket`. The first two of them are the number and sum of observations, so you can use them to calculate average:
 
 ```
   rate(http_request_duration_seconds_sum[5m])
@@ -46,7 +46,7 @@ Technically, in the Prometheus histogram is represented with a bunch of counter 
   rate(http_request_duration_seconds_count[5m])
 ```
 
-Each `_bucket` timeseries contains `le` attribute that gives a value distribution between fixed buckets. Inherently, the bucket is also a counter which contains a number of observations with a value is less or equal `le` attribute value. Note, that the histogram is cumulative, i.e. bucket with `le = 5` will always contain observations from bucket with `le = 3`. Typically, distribution observations over buckets is implemented on client. When we talk about .Net implementation of histogram, then we can use a default distribution or customize it (see below).
+Each `_bucket` timeseries contains `le` attribute that gives a values distribution between fixed buckets. Inherently, the bucket is also a counter which contains a number of observations with a value is less or equal `le` attribute value. Note, that the histogram is cumulative, i.e. bucket with `le = 10` will always contain observations from bucket with `le = 5`. Typically, distribution of observations over buckets is implemented on client. When we talk about .Net implementation of histogram, then we can use a default distribution or customize it (see below).
 
 You can learn more on the [Prometheus documentation page](https://prometheus.io/docs/practices/histograms/).
 
@@ -444,25 +444,31 @@ Metrics.OperationDuration.Record(duration_ms);
 
 Extremely easy!
 
-Let's try it in practice and see what we'll get. You'll find the source code in `Metrics.cs` and `Controllers/OperationController.cs` files. Just build and run the project, open <http://localhost:5000/swagger>, expand `GET /Operation/Run` action, click on `Try it out` and `Execute` some times to generate metrics. Then open Prometheus console and type `otel_operation_duration_ms_bucket` and hit `Execute`. On the Table tab you should see something like that:
+Let's try it in practice and see what we'll get. You'll find the source code in `Metrics.cs` and `Controllers/OperationController.cs` files. Just build and run the project, open the <http://localhost:5000/swagger>, expand `GET /Operation/Run` action, click on `Try it out` and `Execute` some times to generate metrics. Then open Prometheus console on on <http://localhost:9090> and type `otel_operation_duration_ms_bucket` and hit `Execute`. On the Table tab you should see something like that:
 
 ![image](./images/hist_buckets_table.jpg)
 
-As I've mentioned earlier, here we see a bunch of timeseries with different `le` attribute values. Also, you can notice, that the values are increased from `le=0` to `le=+Inf`. The distribution which you see here is a default distribution, but if it is not convenient for you you can change it as you will. To do that you should add a `AddView` extension method call to AddOpenTelemetryMetrics:
+As I've mentioned earlier, here we see a bunch of timeseries with different `le` attribute values. Also, you can notice, that the values are increasing from bucket with `le=0` to `le=+Inf`. The distribution which you see here is a default distribution, but if it is not convenient for you you can change it as you will. To do that you should add a `AddView` extension method call to AddOpenTelemetryMetrics:
 
 ```csharp
 builder.Services.AddOpenTelemetryMetrics(builder =>
 {
     builder
         // all other configuration
-        .AddView(instrumentName: metrics.OperationDuration.Name, new ExplicitBucketHistogramConfiguration() 
-        { 
-            Boundaries = new long[] { 0, 10, 100, 1000, 10000, 100000 }
-        })
+        .AddView(instrumentName: metrics.OperationDuration.Name, 
+            new ExplicitBucketHistogramConfiguration() 
+            { 
+                Boundaries = new long[] { 0, 10, 100, 1000, 10000, 100000 }
+            });
 });
 ```
 
-As you see here, you specify buckets for each individual metric.
+As you see here, you specify buckets borders for each individual metric.
+Default borders are:
+
+```csharp
+Boundaries = new long[] { 0, 5, 10, 25, 50, 75, 100, 250, 500, 1000 }
+```
 
 ## Monitoring Linux Host Metrics
 
