@@ -8,6 +8,56 @@ If you are not familiar with the OpenTelemetry project, I strongly recommend you
 
 This repository is focused on metrics only. It gives you a quick introduction in metrics concepts, if you are not familiar with, and a practical step-by-step guide how to use metrics in your projects as well as how to gather, store, query and visualize them with Prometheus. Also, it shows you how to simply add monitoring of your host with Node Exporter, if your are already using Prometheus. The repository contains a source code of a .Net 6 service instrumented with some useful metrics as well as a bunch of custom metrics. The service can be used as a starting point for your own services with the OpenTelemetry.
 
+### Contents
+
+- [Concepts](#concepts)
+  - [Metrics](#metrics)
+  - [Metrics and Timeseries](metrics-and-timeseries)
+  - [Metrics Names and Attributes (or Labels)](#metrics-names-and-attributes-or-labels)
+  - [Histograms](#histograms)
+- [Step-by-step Guide](#step-by-step-guide)
+  - [1. Create a New Service and Configure OpenTelemetry](#1-create-a-new-service-and-configure-opentelemetry)
+  - [2. Add a Basic Telemetry](#2-add-a-basic-telemetry)
+  - [3. Install and Run Prometheus](#3-install-and-run-prometheus)
+  - [4. Add a Custom Counter](#4-add-a-custom-counter)
+    - [Notes About .Net Implementation](#notes-about-net-implementation)
+    - [Stuff To Be Measured](#stuff-to-be-measured)
+    - [Create Counter](#create-counter)
+    - [Enable Counter](#enable-counter)
+    - [Use Counter](#use-counter)
+    - [Visualize the Data](#visualize-the-data)
+  - [5. Measure HTTP Requests Duration](#5-measure-http-requests-duration)
+    - [Instrument ASP.Net Core](#instrument-aspnet-core)
+    - [Query and Visualize Requests Duration](#query-and-visualize-requests-duration)
+  - [6. Add a Custom Histogram](#6-add-a-custom-histogram)
+- [Monitoring Linux Host Metrics](#monitoring-linux-host-metrics)
+  - [Install and Run Node Exporter](#install-and-run-node-exporter)
+  - [Host Metrics](#host-metrics)
+    - [CPU usage](#cpu-usage)
+    - [Disk Usage](#disk-usage)
+    - [Memory Usage](#memory-usage)
+    - [Swap Usage](#swap-usage)
+- [References](#references)
+
+### References
+
+- [OpenTelemetry](https://opentelemetry.io/)
+  - [What is OpenTelemetry?](https://opentelemetry.io/docs/concepts/what-is-opentelemetry/)
+  - [Metrics](https://opentelemetry.io/docs/concepts/signals/metrics/)
+  - [.Net Instrumentation](https://opentelemetry.io/docs/instrumentation/net/)
+    - [OpenTelemetry .Net](https://github.com/open-telemetry/opentelemetry-dotnet)
+    - [OpenTelemetry .NET Automatic Instrumentation](https://github.com/open-telemetry/opentelemetry-dotnet-instrumentation)
+    - [ASP.NET Core Instrumentation for OpenTelemetry .NET](https://github.com/open-telemetry/opentelemetry-dotnet/tree/main/src/OpenTelemetry.Instrumentation.AspNetCore)
+- [Prometheus](https://prometheus.io/)
+  - [Types of Metrics](https://prometheus.io/docs/tutorials/understanding_metric_types/)
+  - [Histograms And Summaries](https://prometheus.io/docs/practices/histograms/)
+  - [Metric And Label Naming](https://prometheus.io/docs/practices/naming/)
+  - [Expression Language (PromQL)](https://prometheus.io/docs/prometheus/latest/querying/basics/)
+  - [HTTP API](https://prometheus.io/docs/prometheus/latest/querying/api/)
+  - [Monitoring Linux Host Metrics With The Node Exporter](https://prometheus.io/docs/guides/node-exporter/)
+- [.Net Metrics Usage and Best Practices](https://learn.microsoft.com/en-us/dotnet/core/diagnostics/metrics-instrumentation)
+
+
 ## Concepts
 
 ### Metrics
@@ -176,7 +226,17 @@ If you use a service example from this repo, you can play with `Memory/Allocate`
 
 ![image](./images/prometheus-3.jpg)
 
-### Notes About .Net Implementation
+### 4. Add a Custom Counter
+
+I will use a sample service from this repository. To use a custom metric we need some steps:
+
+- some stuff, which we want to measure;
+- the counter itself;
+- enable the counter;
+- use the counter;
+- visualize the data.
+
+#### Notes About .Net Implementation
 
 Metrics is a part of .Net ecosystem. In .Net 3.1 it was supplied as a NuGet package but starting from version 6 it is included by default.
 
@@ -188,15 +248,6 @@ One more convention for a Meter name. Use a dotted hierarchical name that contai
 
 I strongly recommend to read [Metrics Instrumentation](https://learn.microsoft.com/en-us/dotnet/core/diagnostics/metrics-instrumentation) article to learn more about .Net implementation and best practices. This can get rid you of any confusions when use .Net metrics.
 
-### Add a Custom Counter
-
-I will use a sample service from this repository. To use a custom metric we need some steps:
-
-- some stuff, which we want to measure;
-- the counter itself;
-- enable the counter;
-- use the counter;
-- visualize the data.
 
 #### Stuff To Be Measured
 
@@ -224,7 +275,7 @@ The worker implementation is straightforward (see `Worker.cs`):
 
 We want to count the amount of active instances of workers as well as the amount of all created workers.
 
-#### A Counter of Workers
+#### Create Counter
 
 We will use a class to gather all metrics together and will call it `Metrics` (see [Metrics.cs](https://github.com/drwatson1/Otel-sandbox/blob/master/src/otel-webapi-service/otel-webapi-service/Metrics.cs)).
 
@@ -244,7 +295,7 @@ Count = meter.CreateCounter<long>("otel-workers-total", null,  "Number of create
 
 Each counter should have a mandatory name and optional unit and description.
 
-#### Enable our counters
+#### Enable Counter
 
 Each counter is associated with its correspondent `Meter`. To make counters work you should add your meter first. Let's go back to our `Program.cs` and add our meter:
 
@@ -261,7 +312,7 @@ builder.Services.AddOpenTelemetryMetrics(builder =>
 
 Note the name of the added meter, it should be the same as used for your meter. You can add as many meters as you want. After the meter is added, all your counters will be enabled by default and you will be able disable or enable each of them.
 
-#### Use a Counter
+#### Use Counter
 
 Using the counter is pretty simple. Let's return to our worker and add counters:
 
@@ -311,7 +362,7 @@ Prometheus provides a PromQL language to query data. You can learn more on the [
 
 ![image](./images/sum_of_workers.jpg)
 
-### Measure HTTP Requests Duration
+### 5. Measure HTTP Requests Duration
 
 As we are creating a WebAPI service, one of the most interesting metrics can be an average response time. But we can't use counter to measure duration. OpenTelemetry DotNet implements only one option to measure duration - metrics with type `Histogram`. Basically, the `Histogram` metrics consists of a number of buckets as well as a sum and count of measurements. Please, read more about it [here](https://prometheus.io/docs/practices/histograms/).
 
@@ -430,7 +481,7 @@ sum(rate(http_server_duration_ms_count{http_target=~"Job.*"}[5m]))
 
 As earlier, we sum values by all our endpoints, but we can remove `sum` function to get distinct plots for each endpoint.
 
-### Add a Custom Histogram
+### 6. Add a Custom Histogram
 
 Let's add a custom histogram. This is as simple as the counter which we added recently. For example, we have some internal operation and we want to know an average duration of that operation.
 
@@ -512,13 +563,13 @@ Restart the Prometheus. That's all!
 
 Now, let's explore what we've got.
 
-### Host metrics
+### Host Metrics
 
 All metrics, which Node Exporter exposes have `node_` prefix. The list of all metrics you'll find on [GitHub](https://github.com/prometheus/node_exporter#collectors).
 
 Let's see the most interesting metrics.
 
-#### CPU usage
+#### CPU Usage
 
 In the `Expression` field type:
 
@@ -533,6 +584,8 @@ and click `Execute` button or just press `Enter`. Click on `Graph` tab to see so
 To see the same graph you should click to `Show stacked graph` state button.
 
 Here you see CPU usage by individual cores, to see the whole CPU utilization remove `by (cpu)` at the end of the expression. The `[1m]` part of the expression means that the CPU usage is aggregated by 1 minute. You can use [other](https://prometheus.io/docs/prometheus/latest/querying/basics/#time-durations) intervals.
+
+#### Disk Usage
 
 The next one is a disk free space or disk usage. Node Exporter do not expose disk usage, but instead it expose the whole disk size and available bytes. We can combine them to get what we want. Type the following expression:
 
@@ -557,6 +610,8 @@ In my case, I see the following:
 
 Very informative! If your service consume a lot of disk space you can use graphs to monitor a disk consumption.
 
+#### Memory Usage
+
 The next popular metrics are memory and swap usage. There are many memory related metrics but the most useful are:
 
 - node_memory_MemTotal_bytes
@@ -572,6 +627,8 @@ Let's see memory usage:
 If we switch to the `Graph` tab we see the picture:
 
 ![image](./images/mem_usage.jpg)
+
+#### Swap Usage
 
 The last portion of metrics is swap usage. It's mostly the same as memory metrics:
 
